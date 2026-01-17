@@ -1,124 +1,126 @@
 import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
-import random
 import time
+import random
 
-# -------------------------------
-# APPROXIMATE VERTEX COVER (2-Approx)
-# -------------------------------
-def approximate_vertex_cover(G):
+# -------------------------------------------------
+# 2-Approximation Vertex Cover Algorithm
+# -------------------------------------------------
+def vertex_cover_approx(edges):
+    """
+    Implements 2-Approximation Vertex Cover Algorithm
+    Time Complexity: O(E)
+    """
     cover = set()
-    edges = list(G.edges())
+    edges_set = set(edges)
 
-    while edges:
-        u, v = edges.pop()
+    while edges_set:
+        (u, v) = edges_set.pop()
         cover.add(u)
         cover.add(v)
-
-        # remove all edges incident to u or v
-        edges = [(x, y) for (x, y) in edges if x not in (u, v) and y not in (u, v)]
+        edges_set = {e for e in edges_set if u not in e and v not in e}
 
     return cover
 
 
-# -------------------------------
-# STREAMLIT UI
-# -------------------------------
-st.set_page_config(page_title="Approximate Vertex Cover – CCP", layout="wide")
+# -------------------------------------------------
+# Graph Visualization
+# -------------------------------------------------
+def draw_graph(edges, cover=None):
+    G = nx.Graph()
+    G.add_edges_from(edges)
+    pos = nx.spring_layout(G, seed=42)
 
-st.title("🔐 Approximate Vertex Cover for Network Security Monitoring")
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    node_colors = [
+        "red" if cover and node in cover else "lightblue"
+        for node in G.nodes()
+    ]
+
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500, ax=ax)
+    nx.draw_networkx_edges(G, pos, ax=ax)
+    nx.draw_networkx_labels(G, pos, ax=ax)
+
+    ax.set_title("Network Graph Visualization")
+    ax.axis("off")
+    return fig
+
+
+# -------------------------------------------------
+# Streamlit App Configuration
+# -------------------------------------------------
+st.set_page_config(
+    page_title="Approximate Vertex Cover – CCP",
+    layout="wide"
+)
+
+st.title("🔐 Network Security Monitoring")
+st.subheader("Approximate Vertex Cover using 2-Approximation Algorithm")
+
 st.markdown("""
-**Design and Analysis of Algorithms – CCP**
+This application demonstrates an **approximate solution** to the  
+**Vertex Cover problem**,_ATTACHMENT833
 
-This application demonstrates a **polynomial-time approximation algorithm**
-for the **Vertex Cover problem**, which is **NP-Hard**.
+- Vertex Cover is **NP-Hard**
+- Exact solutions are infeasible for large networks
+- A **2-Approximation algorithm** is used for efficiency
 """)
 
-# -------------------------------
-# INPUTS
-# -------------------------------
-st.sidebar.header("Graph Configuration")
+# -------------------------------------------------
+# Session State
+# -------------------------------------------------
+if "edges" not in st.session_state:
+    st.session_state.edges = []
 
-num_vertices = st.sidebar.slider("Number of Devices (Vertices)", 5, 100, 20)
-num_edges = st.sidebar.slider("Number of Communication Links (Edges)", 5, 300, 40)
-seed = st.sidebar.number_input("Random Seed", value=42)
+# -------------------------------------------------
+# Sidebar – Graph Configuration
+# -------------------------------------------------
+with st.sidebar:
+    st.header("Graph Configuration")
 
-generate = st.sidebar.button("Generate Network & Solve")
+    n = st.slider("Number of Devices (Vertices)", 5, 200, 20)
+    m = st.slider("Number of Communication Links (Edges)", 5, 500, 40)
+    seed = st.number_input("Random Seed", value=42)
 
-# -------------------------------
-# MAIN LOGIC
-# -------------------------------
-if generate:
-    random.seed(seed)
-    G = nx.gnm_random_graph(num_vertices, num_edges, seed=seed)
+    if st.button("Generate Network & Solve"):
+        random.seed(seed)
+        G = nx.gnm_random_graph(n, m, seed=seed)
+        st.session_state.edges = list(G.edges())
 
-    st.subheader("📊 Network Statistics")
-    st.write(f"**Total Devices:** {G.number_of_nodes()}")
-    st.write(f"**Total Links:** {G.number_of_edges()}")
+    st.markdown("---")
+    st.header("Manual Edge Entry")
 
-    # Run Approximation Algorithm
-    start = time.time()
-    vertex_cover = approximate_vertex_cover(G)
-    end = time.time()
+    col1, col2 = st.columns(2)
+    u = col1.text_input("Node U")
+    v = col2.text_input("Node V")
 
-    st.subheader("✅ Approximate Vertex Cover Result")
-    st.write(f"**Selected Devices:** {len(vertex_cover)}")
-    st.write(f"**Execution Time:** {end - start:.4f} seconds")
+    if st.button("Add Edge"):
+        if u and v:
+            st.session_state.edges.append((u, v))
+            st.success(f"Added edge ({u}, {v})")
+        else:
+            st.warning("Enter both nodes")
 
-    st.markdown("""
-    🔹 This is a **2-Approximation Algorithm**  
-    🔹 Guaranteed solution ≤ **2 × Optimal Vertex Cover**  
-    🔹 Runs in **polynomial time**
-    """)
+    if st.button("Clear All Edges"):
+        st.session_state.edges = []
+        st.success("All edges cleared")
 
-    # -------------------------------
-    # VISUALIZATION
-    # -------------------------------
-    st.subheader("📌 Network Visualization")
 
-    pos = nx.spring_layout(G, seed=seed)
+# -------------------------------------------------
+# Main Content
+# -------------------------------------------------
+st.header("📊 Current Network")
 
-    plt.figure(figsize=(10, 8))
+if not st.session_state.edges:
+    st.info("No network created yet.")
+else:
+    st.write(f"**Total Edges:** {len(st.session_state.edges)}")
 
-    # Nodes
-    nx.draw_networkx_nodes(
-        G, pos,
-        node_color=["red" if n in vertex_cover else "lightblue" for n in G.nodes()],
-        node_size=500
-    )
+    fig = draw_graph(st.session_state.edges)
+    st.pyplot(fig)
 
-    # Edges
-    nx.draw_networkx_edges(G, pos, alpha=0.6)
-
-    # Labels
-    nx.draw_networkx_labels(G, pos, font_size=8)
-
-    st.pyplot(plt)
-
-    st.markdown("""
-    **🔴 Red Nodes** → Selected for monitoring (Vertex Cover)  
-    **🔵 Blue Nodes** → Not selected
-    """)
-
-# -------------------------------
-# THEORY SECTION
-# -------------------------------
-st.subheader("📘 Why Approximation?")
-st.markdown("""
-- Vertex Cover is an **NP-Hard problem**
-- Exact solutions are impractical for large networks
-- Approximation ensures:
-  - Fast execution
-  - Near-optimal solutions
-  - Scalability to thousands of devices
-""")
-
-st.subheader("🎯 CCP Outcomes Achieved")
-st.markdown("""
-✔ Graph modeling  
-✔ Approximation algorithm  
-✔ Large-scale simulation  
-✔ Visualization for validation  
-✔ Efficient resource allocation
-""")
+    # -------------------------------------------------
+    # Run Algorithm
+    # -------------------------------------------------
